@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// A partir do Prisma 7, a connection string não fica mais aqui — ela mora em
+// prisma.config.ts, na raiz do projeto. Ver esse arquivo.
+datasource db {
+  provider = "postgresql"
+}
+
+// Conta do profissional autônomo — é o próprio negócio.
+// Mantém Account/Session/VerificationToken do NextAuth como no BarberLab original;
+// os campos de negócio substituem o antigo model Barbershop (que não tinha owner).
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  businessName            String?
+  slug                    String?  @unique
+  phone                   String?
+  address                 String?
+  logoUrl                 String?
+  cancellationWindowHours Int      @default(2)
+  onboarded                Boolean  @default(false)
+  // Link do Google Business Profile / Google Maps do negócio — usado no botão
+  // "Avaliar no Google" da página pública e na mensagem pós-atendimento.
+  googleReviewUrl         String?
+
+  services     Service[]
+  availability Availability[]
+  manualBlocks ManualBlock[]
+  bookings     Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Service {
+  id              String    @id @default(uuid())
+  professionalId  String
+  professional    User      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  durationMinutes Int
+  price           Decimal   @db.Decimal(10, 2)
+  active          Boolean   @default(true)
+  order           Int       @default(0)
+  bookings        Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([professionalId])
+}
+
+model Availability {
+  id             String @id @default(uuid())
+  professionalId String
+  professional   User   @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  weekday        Int // 0 = domingo ... 6 = sábado
+  startTime      String // "09:00"
+  endTime        String // "18:00"
+
+  @@index([professionalId, weekday])
+}
+
+model ManualBlock {
+  id             String   @id @default(uuid())
+  professionalId String
+  professional   User     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  startAt        DateTime
+  endAt          DateTime
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([professionalId, startAt, endAt])
+}
+
+enum BookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELED
+  NO_SHOW
+}
+
+model Booking {
+  id             String        @id @default(uuid())
+  professionalId String
+  professional   User          @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  serviceId      String
+  service        Service       @relation(fields: [serviceId], references: [id])
+  clientName     String
+  clientPhone    String
+  scheduledAt    DateTime
+  status         BookingStatus @default(CONFIRMED)
+  cancelToken    String        @unique @default(uuid())
+  canceledAt     DateTime?
+  reminders      ReminderLog[]
+
+  // Avaliação do cliente pós-atendimento — link próprio (não reaproveita o
+  // cancelToken) pra poder circular numa mensagem separada sem dar acesso a
+  // cancelar. reviewRequestedAt marca que o job de varredura (ver
+  // app/api/cron/review-requests) já tentou mandar o convite — sem isso a
+  // cada execução mandaria de novo.
+  reviewToken       String    @unique @default(uuid())
+  reviewRequestedAt DateTime?
+  reviewRating      Int?
+  reviewComment     String?
+  reviewedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([professionalId, scheduledAt])
+  @@index([status, reviewRequestedAt])
+}
+
+model ReminderLog {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  channel   String   @default("WHATSAPP")
+  status    String // SENT | FAILED
+  sentAt    DateTime @default(now())
+}

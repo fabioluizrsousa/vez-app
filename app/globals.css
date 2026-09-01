@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-background: var(--vz-marfim);
+  --color-foreground: var(--vz-tinta);
+
+  --color-card: #ffffff;
+  --color-card-foreground: var(--vz-tinta);
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: var(--vz-tinta);
+
+  --color-primary: var(--vz-cobre);
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: var(--vz-marfim-fundo2);
+  --color-secondary-foreground: var(--vz-tinta);
+
+  --color-muted: var(--vz-marfim-fundo2);
+  --color-muted-foreground: var(--vz-tinta-fraca);
+
+  --color-accent: var(--vz-marfim-fundo2);
+  --color-accent-foreground: var(--vz-tinta);
+
+  --color-destructive: var(--vz-tijolo);
+  --color-destructive-foreground: #ffffff;
+
+  /* Cor semântica de estado — nunca reaproveita o cobre da marca */
+  --color-success: var(--vz-musgo);
+  --color-success-foreground: #ffffff;
+  --color-info: var(--vz-aco);
+  --color-info-foreground: #ffffff;
+
+  --color-border: var(--vz-marfim-borda);
+  --color-input: var(--vz-marfim-borda);
+  --color-ring: var(--vz-cobre);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-sm: calc(var(--radius) - 5px);
+
+  --font-display: var(--vz-font-display);
+  --font-sans: var(--vz-font-sans);
+  --font-mono: var(--vz-font-mono);
+}
+
+@layer base {
+  :root {
+    /* ---- Identidade Copper & Grafite (ver identidade-visual.html) ---- */
+    --vz-grafite: #1a1714;
+    --vz-grafite-alto: #232019;
+    --vz-grafite-linha: #38332a;
+
+    --vz-marfim: #f6f1e7;
+    --vz-marfim-borda: #e6dcc8;
+    --vz-marfim-fundo2: #efe6d4;
+
+    --vz-cobre: #c17a3f;
+    --vz-cobre-alto: #d99658;
+    --vz-aco: #4a6470;
+    --vz-areia: #a89c88;
+    --vz-areia-fraca: #7b7263;
+    --vz-tijolo: #a8432f;
+    --vz-musgo: #5c6b4a;
+
+    --vz-tinta: #2a2318;
+    --vz-tinta-fraca: #6b6252;
+
+    --radius: 0.6rem;
+  }
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border);
+  }
+
+  html {
+    @apply h-full;
+    color-scheme: light;
+  }
+
+  body {
+    @apply h-full bg-background text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Selo de status — cor semântica separada do acento de marca.
+     Escrito em CSS puro (sem @apply de classe custom): no Tailwind v4,
+     @apply só resolve utilitários reais do motor, não uma outra classe
+     definida ao lado — @apply de uma classe custom quebra o build. */
+  .pill-status,
+  .pill-confirmed,
+  .pill-completed,
+  .pill-canceled,
+  .pill-noshow {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding: 0.25rem 0.625rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .pill-confirmed {
+    background: color-mix(in srgb, var(--vz-musgo) 16%, white);
+    color: var(--vz-musgo);
+  }
+  .pill-completed {
+    background: color-mix(in srgb, var(--vz-aco) 16%, white);
+    color: var(--vz-aco);
+  }
+  .pill-canceled {
+    background: color-mix(in srgb, var(--vz-tijolo) 14%, white);
+    color: var(--vz-tijolo);
+  }
+  .pill-noshow {
+    background: var(--vz-marfim-fundo2);
+    color: var(--vz-tinta-fraca);
+  }
+}
