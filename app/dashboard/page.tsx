@@ -1,73 +1,89 @@
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
 import { requireProfessional } from "../_lib/current-professional"
-import { getDayAgenda } from "../_data/get-day-agenda"
+import {
+  getDashboardData,
+  type DashboardPeriod,
+} from "../_data/get-dashboard-data"
 import { formatBRL } from "../_lib/format"
-import StatusPill from "../_components/status-pill"
-import AgendaItemActions from "./agenda-item-actions"
+import PeriodSwitcher from "./_components/period-switcher"
+import StatTile from "./_components/stat-tile"
+import DayTimeline from "./_components/day-timeline"
+import RevenueBarChart from "./_components/revenue-bar-chart"
 
-export default async function DashboardPage() {
+const VALID_PERIODS: DashboardPeriod[] = ["day", "week", "month", "year"]
+
+const DELTA_LABEL: Record<DashboardPeriod, string> = {
+  day: "vs. ontem",
+  week: "vs. semana passada",
+  month: "vs. mês passado",
+  year: "vs. ano passado",
+}
+
+const REVENUE_LABEL: Record<DashboardPeriod, string> = {
+  day: "faturado hoje",
+  week: "faturado na semana",
+  month: "faturado no mês",
+  year: "faturado no ano",
+}
+
+const COUNT_LABEL: Record<DashboardPeriod, string> = {
+  day: "agendamentos hoje",
+  week: "agendamentos na semana",
+  month: "agendamentos no mês",
+  year: "agendamentos no ano",
+}
+
+interface PageProps {
+  searchParams: Promise<{ periodo?: string }>
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
   const professional = await requireProfessional()
-  const today = new Date()
-  const { bookings, revenueToday, countToday } = await getDayAgenda(
-    professional.id,
-    today,
+  const { periodo } = await searchParams
+  const period: DashboardPeriod = VALID_PERIODS.includes(
+    periodo as DashboardPeriod,
   )
+    ? (periodo as DashboardPeriod)
+    : "day"
+
+  const data = await getDashboardData(professional.id, period, new Date())
 
   return (
     <div>
-      <div className="mb-6 flex items-baseline justify-between">
-        <h1 className="font-display text-xl font-extrabold">Agenda do dia</h1>
-        <span className="text-muted-foreground font-mono text-xs">
-          {format(today, "EEE, d 'de' MMM.", { locale: ptBR })}
-        </span>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-extrabold">Agenda</h1>
+          <span className="text-muted-foreground font-mono text-xs capitalize">
+            {data.rangeLabel}
+          </span>
+        </div>
+        <PeriodSwitcher active={period} />
       </div>
 
-      {bookings.length === 0 && (
-        <p className="text-muted-foreground text-sm">
-          Nenhum agendamento pra hoje ainda.
-        </p>
-      )}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <StatTile
+          label={REVENUE_LABEL[period]}
+          value={formatBRL(data.kpis.revenue.value)}
+          deltaPct={data.kpis.revenue.deltaPct}
+          deltaLabel={DELTA_LABEL[period]}
+          sparkline={data.period === "day" ? data.sparkline : undefined}
+        />
+        <StatTile
+          label={COUNT_LABEL[period]}
+          value={String(data.kpis.count.value)}
+          deltaPct={data.kpis.count.deltaPct}
+          deltaLabel={DELTA_LABEL[period]}
+        />
+      </div>
 
-      <ul className="divide-border divide-y">
-        {bookings.map((booking) => (
-          <li key={booking.id} className="flex items-start gap-3 py-3.5">
-            <span className="text-muted-foreground w-11 pt-0.5 font-mono text-sm tabular-nums">
-              {format(booking.scheduledAt, "HH:mm")}
-            </span>
-            <div className="flex-1">
-              <p className="text-sm font-semibold">{booking.clientName}</p>
-              <p className="text-muted-foreground text-xs">
-                {booking.service.name}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusPill status={booking.status} />
-              {booking.status === "CONFIRMED" && (
-                <AgendaItemActions bookingId={booking.id} />
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      <p className="text-muted-foreground mt-8 mb-2 font-mono text-[11px] tracking-wide uppercase">
-        Hoje
+      <p className="text-muted-foreground mb-3 font-mono text-[11px] tracking-wide uppercase">
+        {data.period === "day" ? "Linha do tempo" : "Faturamento no período"}
       </p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-secondary rounded-lg px-3.5 py-3">
-          <p className="font-mono text-lg font-semibold tabular-nums">
-            {formatBRL(revenueToday)}
-          </p>
-          <p className="text-muted-foreground text-[11px]">faturado</p>
-        </div>
-        <div className="bg-secondary rounded-lg px-3.5 py-3">
-          <p className="font-mono text-lg font-semibold tabular-nums">
-            {countToday}
-          </p>
-          <p className="text-muted-foreground text-[11px]">agendamentos</p>
-        </div>
-      </div>
+
+      {data.period === "day" ? (
+        <DayTimeline bookings={data.bookings} />
+      ) : (
+        <RevenueBarChart data={data.series} />
+      )}
     </div>
   )
 }
