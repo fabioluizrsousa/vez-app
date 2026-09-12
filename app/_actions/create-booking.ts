@@ -121,6 +121,9 @@ export async function createBooking(input: CreateBookingInput) {
           calendarUrl,
         ],
       })
+      if (!result.ok && !result.skipped) {
+        console.error("Falha ao notificar barbeiro no WhatsApp:", result.error)
+      }
       if (!result.skipped) {
         await db.reminderLog.create({
           data: {
@@ -141,6 +144,9 @@ export async function createBooking(input: CreateBookingInput) {
           "confirmacao_agendamento_cliente",
         params: [businessName, dateLabel, timeLabel, calendarUrl],
       })
+      if (!result.ok && !result.skipped) {
+        console.error("Falha ao notificar cliente no WhatsApp:", result.error)
+      }
       if (!result.skipped) {
         await db.reminderLog.create({
           data: {
@@ -150,6 +156,11 @@ export async function createBooking(input: CreateBookingInput) {
           },
         })
       }
+    } else {
+      console.error(
+        "Aviso ao cliente pulado — telefone não reconhecido:",
+        clientPhone,
+      )
     }
   } catch (error) {
     console.error("Falha ao enviar aviso de WhatsApp:", error)
