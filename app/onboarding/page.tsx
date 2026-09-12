@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { requireProfessional } from "../_lib/current-professional"
+import { getSiteHost } from "../_lib/site-host"
 import Logo from "../_components/logo"
 import BusinessProfileForm from "../dashboard/negocio/business-profile-form"
 
@@ -20,8 +21,9 @@ export default async function OnboardingPage() {
       </div>
       <BusinessProfileForm
         slug={null}
+        siteHost={getSiteHost()}
         redirectTo="/dashboard/negocio"
-                initial={{
+        initial={{
           businessName: professional.businessName ?? professional.name ?? "",
           phone: professional.phone ?? "",
           address: professional.address ?? "",
