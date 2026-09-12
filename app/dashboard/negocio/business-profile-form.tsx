@@ -19,12 +19,14 @@ interface BusinessProfileFormProps {
     logoUrl: string | null
   }
   slug: string | null
+  siteHost: string
   redirectTo?: string
 }
 
 export default function BusinessProfileForm({
   initial,
   slug,
+  siteHost,
   redirectTo,
 }: BusinessProfileFormProps) {
   const router = useRouter()
@@ -96,7 +98,7 @@ export default function BusinessProfileForm({
         />
         {slug && (
           <p className="text-muted-foreground font-mono text-xs">
-            agendavez.com.br/{slug}
+            {siteHost}/{slug}
           </p>
         )}
       </div>
