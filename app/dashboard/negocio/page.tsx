@@ -1,5 +1,6 @@
 import { requireProfessional } from "../../_lib/current-professional"
 import { db } from "../../_lib/prisma"
+import { getSiteHost } from "../../_lib/site-host"
 import BusinessProfileForm from "./business-profile-form"
 import AvailabilityEditor from "./availability-editor"
 
@@ -17,6 +18,7 @@ export default async function NegocioPage() {
         </h1>
         <BusinessProfileForm
           slug={professional.slug}
+          siteHost={getSiteHost()}
           initial={{
             businessName: professional.businessName ?? "",
             phone: professional.phone ?? "",
