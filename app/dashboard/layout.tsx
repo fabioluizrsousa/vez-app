@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-5xl px-5 py-6 pb-24 md:pb-6">
+      <main className="mx-auto max-w-5xl px-4 py-4 pb-36 sm:px-5 md:py-6 md:pb-6">
         {children}
       </main>
       <MobileBottomNav />
