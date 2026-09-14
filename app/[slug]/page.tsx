@@ -8,6 +8,8 @@ import Logo from "../_components/logo"
 import { formatBRL, formatDuration } from "../_lib/format"
 import { cn } from "../_lib/utils"
 
+export const dynamic = "force-dynamic"
+
 interface PageProps {
   params: Promise<{ slug: string }>
 }
