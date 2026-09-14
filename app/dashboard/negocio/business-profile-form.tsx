@@ -46,9 +46,21 @@ export default function BusinessProfileForm({
   const [image, setImage] = useState<string | null>(initial.image)
   const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl)
 
-  const publicUrl = slug ? `${siteHost.replace(/\/$/, "")}/${slug}` : null
+  // O href relativo mantém "Ver como cliente" no mesmo ambiente em que o
+  // painel está aberto (Preview ou produção). Para copiar/compartilhar,
+  // montamos a URL absoluta a partir de window.location.origin no clique.
+  const publicPath = slug ? `/${slug}` : null
+  const publicDisplayUrl = slug
+    ? `${siteHost.replace(/^https?:\/\//, "").replace(/\/$/, "")}/${slug}`
+    : null
+
+  function getAbsolutePublicUrl() {
+    if (!publicPath || typeof window === "undefined") return null
+    return new URL(publicPath, window.location.origin).toString()
+  }
 
   async function handleCopyPublicUrl() {
+    const publicUrl = getAbsolutePublicUrl()
     if (!publicUrl) return
     try {
       await navigator.clipboard.writeText(publicUrl)
@@ -60,10 +72,15 @@ export default function BusinessProfileForm({
   }
 
   function handleShareWhatsApp() {
+    const publicUrl = getAbsolutePublicUrl()
     if (!publicUrl) return
     const label = businessName.trim() || "meu negócio"
     const text = `Agende seu horário em ${label}: ${publicUrl}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    )
   }
 
   function handleSave() {
@@ -118,13 +135,13 @@ export default function BusinessProfileForm({
           onChange={(e) => setBusinessName(e.target.value)}
           placeholder="Ex: Renato Cortes"
         />
-        {publicUrl && (
+        {publicPath && publicDisplayUrl && (
           <div className="mt-1 flex min-w-0 flex-col gap-2">
             <p
               className="text-muted-foreground max-w-full truncate font-mono text-xs"
-              title={publicUrl}
+              title={publicDisplayUrl}
             >
-              {publicUrl}
+              {publicDisplayUrl}
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -144,7 +161,7 @@ export default function BusinessProfileForm({
                 Compartilhar WhatsApp
               </button>
               <a
-                href={publicUrl}
+                href={publicPath}
                 target="_blank"
                 rel="noreferrer"
                 className="border-input text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
