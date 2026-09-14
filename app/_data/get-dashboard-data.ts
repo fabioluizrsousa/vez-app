@@ -196,9 +196,11 @@ export async function getDashboardData(
       label: stripTrailingDot(format(d, "EEE", { locale: ptBR })),
     }))
   } else if (period === "month") {
-    buckets = eachWeekOfInterval({ start, end }, WEEK_OPTS).map((d, i) => ({
+    // Rótulo é o dia de início de cada semana (ex: "1/9", "8/9") em vez de
+    // "Semana 1/2/3" — número de semana sem a data junto não dizia muito.
+    buckets = eachWeekOfInterval({ start, end }, WEEK_OPTS).map((d) => ({
       key: startOfWeek(d, WEEK_OPTS).getTime(),
-      label: `Sem ${i + 1}`,
+      label: format(startOfWeek(d, WEEK_OPTS), "d/MM"),
     }))
   } else {
     buckets = eachMonthOfInterval({ start, end }).map((d) => ({
