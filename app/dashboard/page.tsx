@@ -1,5 +1,6 @@
 import { isValid, parse } from "date-fns"
 import { requireProfessional } from "../_lib/current-professional"
+import { db } from "../_lib/prisma"
 import {
   getDashboardData,
   type DashboardPeriod,
@@ -10,6 +11,7 @@ import DateNav from "./_components/date-nav"
 import StatTile from "./_components/stat-tile"
 import DayTimeline from "./_components/day-timeline"
 import RevenueBarChart from "./_components/revenue-bar-chart"
+import QuickActions from "./_components/quick-actions"
 
 const VALID_PERIODS: DashboardPeriod[] = ["day", "week", "month", "year"]
 
@@ -38,9 +40,6 @@ interface PageProps {
   searchParams: Promise<{ periodo?: string; data?: string }>
 }
 
-// "data" na URL é opcional — sem ela, é sempre hoje. Com ela, dá pra navegar
-// pra qualquer dia/semana/mês passado ou futuro (ver DateNav) — sem isso não
-// tinha como ver, por exemplo, os agendamentos já marcados pra amanhã.
 function parseReferenceDate(raw: string | undefined): Date {
   if (!raw) return new Date()
   const parsed = parse(raw, "yyyy-MM-dd", new Date())
@@ -50,19 +49,20 @@ function parseReferenceDate(raw: string | undefined): Date {
 export default async function DashboardPage({ searchParams }: PageProps) {
   const professional = await requireProfessional()
   const { periodo, data: dataParam } = await searchParams
-  const period: DashboardPeriod = VALID_PERIODS.includes(
-    periodo as DashboardPeriod,
-  )
+  const period: DashboardPeriod = VALID_PERIODS.includes(periodo as DashboardPeriod)
     ? (periodo as DashboardPeriod)
     : "day"
   const referenceDate = parseReferenceDate(dataParam)
   const isToday = !dataParam
 
-  const dashboardData = await getDashboardData(
-    professional.id,
-    period,
-    referenceDate,
-  )
+  const [dashboardData, services] = await Promise.all([
+    getDashboardData(professional.id, period, referenceDate),
+    db.service.findMany({
+      where: { professionalId: professional.id, active: true },
+      select: { id: true, name: true },
+      orderBy: { order: "asc" },
+    }),
+  ])
 
   return (
     <div>
@@ -74,14 +74,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <DateNav
-            period={period}
-            referenceDate={referenceDate}
-            isToday={isToday}
-          />
+          <DateNav period={period} referenceDate={referenceDate} isToday={isToday} />
           <PeriodSwitcher active={period} />
         </div>
       </div>
+
+      <QuickActions professionalId={professional.id} services={services} />
 
       <div className="mb-6 grid grid-cols-2 gap-3">
         <StatTile
@@ -89,9 +87,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           value={formatBRL(dashboardData.kpis.revenue.value)}
           deltaPct={dashboardData.kpis.revenue.deltaPct}
           deltaLabel={DELTA_LABEL[period]}
-          sparkline={
-            dashboardData.period === "day" ? dashboardData.sparkline : undefined
-          }
+          sparkline={dashboardData.period === "day" ? dashboardData.sparkline : undefined}
         />
         <StatTile
           label={COUNT_LABEL[period]}
@@ -106,7 +102,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       </p>
 
       {dashboardData.period === "day" ? (
-        <DayTimeline bookings={dashboardData.bookings} />
+        <DayTimeline bookings={dashboardData.bookings} manualBlocks={dashboardData.manualBlocks} />
       ) : (
         <RevenueBarChart data={dashboardData.series} />
       )}
