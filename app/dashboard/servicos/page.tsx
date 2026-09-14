@@ -12,7 +12,7 @@ export default async function ServicosPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-baseline justify-between">
+      <div className="mb-4 flex items-baseline justify-between sm:mb-6">
         <h1 className="font-display text-xl font-extrabold">Meus Serviços</h1>
       </div>
 
@@ -20,10 +20,10 @@ export default async function ServicosPage() {
         {services.map((service) => (
           <li
             key={service.id}
-            className="flex items-center justify-between gap-4 py-3.5"
+            className="flex items-center justify-between gap-3 py-3 sm:gap-4 sm:py-3.5"
           >
-            <div>
-              <p className="text-sm font-semibold">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
                 {service.name}
                 {!service.active && (
                   <span className="text-muted-foreground ml-2 text-[11px] font-normal">
@@ -35,7 +35,7 @@ export default async function ServicosPage() {
                 {formatDuration(service.durationMinutes)}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <span className="font-mono text-sm tabular-nums">
                 {formatBRL(service.price)}
               </span>
