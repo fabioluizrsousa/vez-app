@@ -13,6 +13,7 @@ export default function ManualBlockActions({ blockId }: { blockId: string }) {
       onClick={() =>
         startTransition(async () => {
           await deleteManualBlock(blockId)
+          window.dispatchEvent(new Event("vez:availability-changed"))
         })
       }
       className="text-muted-foreground hover:text-destructive font-mono text-[10.5px] uppercase"
