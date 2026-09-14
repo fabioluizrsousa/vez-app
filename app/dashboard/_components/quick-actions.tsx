@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { getSlotsForDate } from "../../_actions/get-available-slots"
 import { createProfessionalBooking } from "../../_actions/professional-bookings"
 import { createManualBlock } from "../../_actions/manual-blocks"
+import { formatWhatsAppBR, isValidWhatsAppBR } from "../../_lib/phone"
 import { Button } from "../../_components/ui/button"
 
 interface ServiceOption {
@@ -35,6 +36,9 @@ export default function QuickActions({
   const [blockEnd, setBlockEnd] = useState("")
   const [blockReason, setBlockReason] = useState("")
   const [error, setError] = useState<string | null>(null)
+
+  const phoneValid = isValidWhatsAppBR(clientPhone)
+  const showPhoneError = clientPhone.length > 0 && !phoneValid
 
   const loadSlots = useCallback(
     (nextServiceId = serviceId, nextDate = date) => {
@@ -81,7 +85,7 @@ export default function QuickActions({
   }
 
   function saveBooking() {
-    if (!serviceId || !date || !time || !clientName.trim() || !clientPhone.trim()) return
+    if (!serviceId || !date || !time || !clientName.trim() || !phoneValid) return
     setError(null)
     startTransition(async () => {
       const result = await createProfessionalBooking({
@@ -200,10 +204,16 @@ export default function QuickActions({
             <span className="text-muted-foreground mb-1 block">WhatsApp</span>
             <input
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
+              onChange={(e) => setClientPhone(formatWhatsAppBR(e.target.value))}
+              inputMode="tel"
               placeholder="(27) 99999-0000"
-              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+              className={`bg-background w-full rounded-md border px-3 py-2 text-sm ${showPhoneError ? "border-destructive" : "border-input"}`}
             />
+            {showPhoneError && (
+              <span className="text-destructive mt-1 block text-[11px]">
+                Informe um celular válido com DDD.
+              </span>
+            )}
           </label>
           {error && (
             <p className="text-destructive text-sm sm:col-span-2">{error}</p>
@@ -216,7 +226,7 @@ export default function QuickActions({
                 !date ||
                 !time ||
                 !clientName.trim() ||
-                !clientPhone.trim()
+                !phoneValid
               }
               onClick={saveBooking}
             >
