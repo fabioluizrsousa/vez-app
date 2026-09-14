@@ -64,6 +64,20 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     }),
   ])
 
+  const agendaRevision =
+    dashboardData.period === "day"
+      ? [
+          ...dashboardData.bookings.map(
+            (booking) =>
+              `${booking.id}:${booking.status}:${booking.scheduledAt.toISOString()}`,
+          ),
+          ...dashboardData.manualBlocks.map(
+            (block) =>
+              `${block.id}:${block.startAt.toISOString()}:${block.endAt.toISOString()}`,
+          ),
+        ].join("|")
+      : `${period}:${referenceDate.toISOString()}`
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -79,7 +93,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <QuickActions professionalId={professional.id} services={services} />
+      <QuickActions
+        key={agendaRevision}
+        professionalId={professional.id}
+        services={services}
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3">
         <StatTile
@@ -102,7 +120,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       </p>
 
       {dashboardData.period === "day" ? (
-        <DayTimeline bookings={dashboardData.bookings} manualBlocks={dashboardData.manualBlocks} />
+        <DayTimeline
+          bookings={dashboardData.bookings}
+          manualBlocks={dashboardData.manualBlocks}
+        />
       ) : (
         <RevenueBarChart data={dashboardData.series} />
       )}
