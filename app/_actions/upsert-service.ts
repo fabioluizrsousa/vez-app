@@ -12,6 +12,12 @@ export interface ServiceInput {
   description?: string
 }
 
+function revalidateServiceViews(slug: string | null) {
+  revalidatePath("/dashboard/servicos")
+  revalidatePath("/dashboard")
+  if (slug) revalidatePath(`/${slug}`)
+}
+
 export async function upsertService(input: ServiceInput) {
   const professional = await requireProfessional()
 
@@ -51,7 +57,7 @@ export async function upsertService(input: ServiceInput) {
     })
   }
 
-  revalidatePath("/dashboard/servicos")
+  revalidateServiceViews(professional.slug)
   return { ok: true as const }
 }
 
@@ -63,5 +69,5 @@ export async function toggleServiceActive(serviceId: string, active: boolean) {
     data: { active },
   })
 
-  revalidatePath("/dashboard/servicos")
+  revalidateServiceViews(professional.slug)
 }
