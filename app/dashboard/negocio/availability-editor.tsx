@@ -25,9 +25,9 @@ export default function AvailabilityEditor({
   const [enabledDays, setEnabledDays] = useState<Set<number>>(
     new Set(initial.map((w) => w.weekday)),
   )
-  // Cada dia guarda uma LISTA de janelas — é isso que permite intervalos
-  // (ex: 09:00-12:00 e 13:00-18:00 pra representar o almoço) em vez de um
-  // único período contínuo por dia.
+  // Cada dia guarda uma lista de períodos de atendimento. Para representar
+  // uma pausa de almoço, o correto é dividir o dia, por exemplo:
+  // 09:00-12:00 e 13:00-18:00.
   const [windows, setWindows] = useState<Record<number, Window[]>>(() => {
     const map: Record<number, Window[]> = {}
     for (const day of WEEKDAYS) {
@@ -103,6 +103,11 @@ export default function AvailabilityEditor({
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-muted-foreground text-sm">
+        Para criar uma pausa, divida o expediente em períodos. Exemplo de almoço:
+        09:00–12:00 e 13:00–18:00.
+      </p>
+
       {WEEKDAYS.map((day) => {
         const active = enabledDays.has(day)
         const dayWindows = windows[day]
@@ -145,7 +150,7 @@ export default function AvailabilityEditor({
                       <button
                         type="button"
                         onClick={() => removeWindow(day, index)}
-                        aria-label="Remover intervalo"
+                        aria-label="Remover período"
                         className="text-muted-foreground hover:text-foreground"
                       >
                         <X className="size-3.5" />
@@ -159,7 +164,7 @@ export default function AvailabilityEditor({
                   className="text-primary flex w-fit items-center gap-1 text-xs font-medium"
                 >
                   <Plus className="size-3.5" />
-                  Adicionar intervalo (ex: almoço)
+                  Adicionar outro período de atendimento
                 </button>
               </div>
             ) : (
