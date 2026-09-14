@@ -11,7 +11,7 @@ const NAV_ITEMS = [
 const Header = () => {
   return (
     <header className="border-border bg-background/95 sticky top-0 z-50 border-b backdrop-blur-sm">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-2.5 md:py-4">
         <Logo href="/dashboard" />
 
         <nav className="hidden items-center gap-6 md:flex">
