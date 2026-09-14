@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { db } from "../_lib/prisma"
 import { requireProfessional } from "../_lib/current-professional"
 import { computeSlotsForDate } from "../_lib/get-slots-for-date"
+import { isValidWhatsAppBR } from "../_lib/phone"
 
 class BookingRejected extends Error {}
 
@@ -22,6 +23,12 @@ export async function createProfessionalBooking(input: {
 
   if (!input.clientName.trim() || !input.clientPhone.trim()) {
     return { ok: false as const, error: "Preencha nome e WhatsApp." }
+  }
+  if (!isValidWhatsAppBR(input.clientPhone)) {
+    return {
+      ok: false as const,
+      error: "Informe um celular válido com DDD.",
+    }
   }
   if (Number.isNaN(scheduledAt.getTime())) {
     return { ok: false as const, error: "Data ou horário inválido." }
@@ -59,7 +66,10 @@ export async function createProfessionalBooking(input: {
       return { ok: false as const, error: error.message }
     }
     console.error("Falha ao criar agendamento manual:", error)
-    return { ok: false as const, error: "Não foi possível criar o agendamento. Tente outro horário." }
+    return {
+      ok: false as const,
+      error: "Não foi possível criar o agendamento. Tente outro horário.",
+    }
   }
 
   revalidatePath("/dashboard")
@@ -69,7 +79,11 @@ export async function createProfessionalBooking(input: {
 export async function getRescheduleSlots(bookingId: string, dateISO: string) {
   const professional = await requireProfessional()
   const booking = await db.booking.findFirst({
-    where: { id: bookingId, professionalId: professional.id, status: "CONFIRMED" },
+    where: {
+      id: bookingId,
+      professionalId: professional.id,
+      status: "CONFIRMED",
+    },
     select: { id: true, serviceId: true },
   })
 
@@ -107,7 +121,9 @@ export async function rescheduleBooking(input: {
           },
           select: { id: true, serviceId: true },
         })
-        if (!booking) throw new BookingRejected("Agendamento não encontrado ou já encerrado.")
+        if (!booking) {
+          throw new BookingRejected("Agendamento não encontrado ou já encerrado.")
+        }
 
         const { service, slots } = await computeSlotsForDate(
           tx,
@@ -132,7 +148,10 @@ export async function rescheduleBooking(input: {
       return { ok: false as const, error: error.message }
     }
     console.error("Falha ao reagendar:", error)
-    return { ok: false as const, error: "Não foi possível reagendar. Escolha outro horário." }
+    return {
+      ok: false as const,
+      error: "Não foi possível reagendar. Escolha outro horário.",
+    }
   }
 
   revalidatePath("/dashboard")
