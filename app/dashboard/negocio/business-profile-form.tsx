@@ -88,7 +88,7 @@ export default function BusinessProfileForm({
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex min-w-0 flex-col gap-1.5">
         <Label htmlFor="businessName">Nome do negócio</Label>
         <Input
           id="businessName"
@@ -97,7 +97,10 @@ export default function BusinessProfileForm({
           placeholder="Ex: Renato Cortes"
         />
         {slug && (
-          <p className="text-muted-foreground font-mono text-xs">
+          <p
+            className="text-muted-foreground max-w-full truncate font-mono text-xs"
+            title={`${siteHost}/${slug}`}
+          >
             {siteHost}/{slug}
           </p>
         )}
