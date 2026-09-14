@@ -9,13 +9,29 @@ export function toWhatsAppE164BR(rawPhone: string): string | null {
   const digits = rawPhone.replace(/\D/g, "")
   if (!digits) return null
 
-  // Já veio com o código do país (55)? Só é o caso se sobrar mais de 11
-  // dígitos depois de tirar o "55" — um DDD real nunca começa com "55".
   const withoutCountry =
     digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits
 
-  // DDD (2 dígitos) + celular com 9 dígitos (o "9" na frente + 8 números).
-  if (withoutCountry.length !== 11) return null
+  // DDD (2 dígitos) + celular (9 dígitos), começando com 9.
+  if (withoutCountry.length !== 11 || withoutCountry[2] !== "9") return null
 
   return `+55${withoutCountry}`
+}
+
+export function isValidWhatsAppBR(rawPhone: string): boolean {
+  return toWhatsAppE164BR(rawPhone) !== null
+}
+
+/**
+ * Máscara leve pro formulário. Mantém no máximo DDD + 9 dígitos e produz
+ * algo como "(27) 99999-8888".
+ */
+export function formatWhatsAppBR(rawPhone: string): string {
+  let digits = rawPhone.replace(/\D/g, "")
+  if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2)
+  digits = digits.slice(0, 11)
+
+  if (digits.length <= 2) return digits ? `(${digits}` : ""
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
 }
