@@ -11,9 +11,9 @@ export default async function NegocioPage() {
   })
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-8 sm:gap-10">
       <div>
-        <h1 className="font-display mb-5 text-xl font-extrabold">
+        <h1 className="font-display mb-4 text-xl font-extrabold sm:mb-5">
           Meu negócio
         </h1>
         <BusinessProfileForm
