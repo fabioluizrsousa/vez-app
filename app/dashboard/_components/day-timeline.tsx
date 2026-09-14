@@ -60,7 +60,10 @@ export default function DayTimeline({
             <div className="flex shrink-0 flex-col items-end gap-1.5">
               <StatusPill status={booking.status} />
               {booking.status === "CONFIRMED" && (
-                <AgendaItemActions bookingId={booking.id} />
+                <AgendaItemActions
+                  bookingId={booking.id}
+                  canComplete={booking.scheduledAt <= new Date()}
+                />
               )}
             </div>
           </div>
