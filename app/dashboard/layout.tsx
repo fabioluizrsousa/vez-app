@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "../_lib/auth"
 import { db } from "../_lib/prisma"
 import Header from "../_components/header"
+import MobileBottomNav from "./_components/mobile-bottom-nav"
 
 export default async function DashboardLayout({
   children,
@@ -22,7 +23,10 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-5xl px-5 py-6">{children}</main>
+      <main className="mx-auto max-w-5xl px-5 py-6 pb-24 md:pb-6">
+        {children}
+      </main>
+      <MobileBottomNav />
     </div>
   )
 }
