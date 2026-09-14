@@ -83,5 +83,7 @@ export function getAvailableSlots({
     }
   }
 
-  return slots
+  // Faixas de disponibilidade sobrepostas podem gerar o mesmo horário mais
+  // de uma vez. O Set remove duplicidades e o sort mantém a sequência correta.
+  return Array.from(new Set(slots)).sort((a, b) => a.localeCompare(b))
 }
