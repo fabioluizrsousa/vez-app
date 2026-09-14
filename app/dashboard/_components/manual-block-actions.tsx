@@ -10,7 +10,11 @@ export default function ManualBlockActions({ blockId }: { blockId: string }) {
     <button
       type="button"
       disabled={isPending}
-      onClick={() => startTransition(() => deleteManualBlock(blockId))}
+      onClick={() =>
+        startTransition(async () => {
+          await deleteManualBlock(blockId)
+        })
+      }
       className="text-muted-foreground hover:text-destructive font-mono text-[10.5px] uppercase"
     >
       {isPending ? "Removendo…" : "Desbloquear"}
