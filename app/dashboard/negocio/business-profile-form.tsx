@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { Copy, ExternalLink, MessageCircle } from "lucide-react"
 import { updateBusinessProfile } from "../../_actions/update-business-profile"
 import { Button } from "../../_components/ui/button"
 import { Input } from "../../_components/ui/input"
@@ -33,6 +34,7 @@ export default function BusinessProfileForm({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const [businessName, setBusinessName] = useState(initial.businessName)
   const [phone, setPhone] = useState(initial.phone)
@@ -43,6 +45,26 @@ export default function BusinessProfileForm({
   const [googleReviewUrl, setGoogleReviewUrl] = useState(initial.googleReviewUrl)
   const [image, setImage] = useState<string | null>(initial.image)
   const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl)
+
+  const publicUrl = slug ? `${siteHost.replace(/\/$/, "")}/${slug}` : null
+
+  async function handleCopyPublicUrl() {
+    if (!publicUrl) return
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError("Não foi possível copiar o link. Tente novamente.")
+    }
+  }
+
+  function handleShareWhatsApp() {
+    if (!publicUrl) return
+    const label = businessName.trim() || "meu negócio"
+    const text = `Agende seu horário em ${label}: ${publicUrl}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
+  }
 
   function handleSave() {
     setError(null)
@@ -96,13 +118,42 @@ export default function BusinessProfileForm({
           onChange={(e) => setBusinessName(e.target.value)}
           placeholder="Ex: Renato Cortes"
         />
-        {slug && (
-          <p
-            className="text-muted-foreground max-w-full truncate font-mono text-xs"
-            title={`${siteHost}/${slug}`}
-          >
-            {siteHost}/{slug}
-          </p>
+        {publicUrl && (
+          <div className="mt-1 flex min-w-0 flex-col gap-2">
+            <p
+              className="text-muted-foreground max-w-full truncate font-mono text-xs"
+              title={publicUrl}
+            >
+              {publicUrl}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleCopyPublicUrl}
+                className="border-input text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
+              >
+                <Copy className="size-3.5" />
+                {copied ? "Link copiado" : "Copiar link"}
+              </button>
+              <button
+                type="button"
+                onClick={handleShareWhatsApp}
+                className="border-input text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
+              >
+                <MessageCircle className="size-3.5" />
+                Compartilhar WhatsApp
+              </button>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="border-input text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
+              >
+                <ExternalLink className="size-3.5" />
+                Ver como cliente
+              </a>
+            </div>
+          </div>
         )}
       </div>
 
