@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useCallback, useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { getSlotsForDate } from "../../_actions/get-available-slots"
 import { createProfessionalBooking } from "../../_actions/professional-bookings"
@@ -36,19 +36,48 @@ export default function QuickActions({
   const [blockReason, setBlockReason] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  function loadSlots(nextServiceId = serviceId, nextDate = date) {
-    setTime("")
-    setSlots([])
+  const loadSlots = useCallback(
+    (nextServiceId = serviceId, nextDate = date) => {
+      setTime("")
+      setSlots([])
+      setError(null)
+      if (!nextServiceId || !nextDate) return
+      startTransition(async () => {
+        const result = await getSlotsForDate(
+          professionalId,
+          nextServiceId,
+          `${nextDate}T12:00:00`,
+        )
+        setSlots(result)
+      })
+    },
+    [date, professionalId, serviceId],
+  )
+
+  useEffect(() => {
+    const refreshAvailability = () => {
+      if (mode === "booking") loadSlots(serviceId, date)
+    }
+
+    window.addEventListener("vez:availability-changed", refreshAvailability)
+    return () =>
+      window.removeEventListener("vez:availability-changed", refreshAvailability)
+  }, [date, loadSlots, mode, serviceId])
+
+  function toggleBooking() {
+    const opening = mode !== "booking"
     setError(null)
-    if (!nextServiceId || !nextDate) return
-    startTransition(async () => {
-      const result = await getSlotsForDate(
-        professionalId,
-        nextServiceId,
-        `${nextDate}T12:00:00`,
-      )
-      setSlots(result)
-    })
+    if (!opening) {
+      setMode(null)
+      return
+    }
+    setMode("booking")
+    loadSlots(serviceId, date)
+  }
+
+  function toggleBlock() {
+    setMode(mode === "block" ? null : "block")
+    setError(null)
   }
 
   function saveBooking() {
@@ -93,6 +122,9 @@ export default function QuickActions({
       setBlockStart("")
       setBlockEnd("")
       setBlockReason("")
+      setTime("")
+      setSlots([])
+      window.dispatchEvent(new Event("vez:availability-changed"))
       router.refresh()
     })
   }
@@ -100,12 +132,8 @@ export default function QuickActions({
   return (
     <div className="mb-6">
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => { setMode(mode === "booking" ? null : "booking"); setError(null) }}>
-          + Novo agendamento
-        </Button>
-        <Button variant="outline" onClick={() => { setMode(mode === "block" ? null : "block"); setError(null) }}>
-          Bloquear horário
-        </Button>
+        <Button onClick={toggleBooking}>+ Novo agendamento</Button>
+        <Button variant="outline" onClick={toggleBlock}>Bloquear horário</Button>
       </div>
 
       {mode === "booking" && (
@@ -114,10 +142,17 @@ export default function QuickActions({
             <span className="text-muted-foreground mb-1 block">Serviço</span>
             <select
               value={serviceId}
-              onChange={(e) => { setServiceId(e.target.value); loadSlots(e.target.value, date) }}
+              onChange={(e) => {
+                setServiceId(e.target.value)
+                loadSlots(e.target.value, date)
+              }}
               className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
             >
-              {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-xs">
@@ -125,15 +160,22 @@ export default function QuickActions({
             <input
               type="date"
               value={date}
-              onChange={(e) => { setDate(e.target.value); loadSlots(serviceId, e.target.value) }}
+              onChange={(e) => {
+                setDate(e.target.value)
+                loadSlots(serviceId, e.target.value)
+              }}
               className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
             />
           </label>
           <label className="text-xs sm:col-span-2">
             <span className="text-muted-foreground mb-1 block">Horário</span>
             <div className="flex flex-wrap gap-2">
-              {isPending && date && <span className="text-muted-foreground text-sm">Carregando…</span>}
-              {!isPending && date && slots.length === 0 && <span className="text-muted-foreground text-sm">Sem horários livres.</span>}
+              {isPending && date && (
+                <span className="text-muted-foreground text-sm">Carregando…</span>
+              )}
+              {!isPending && date && slots.length === 0 && (
+                <span className="text-muted-foreground text-sm">Sem horários livres.</span>
+              )}
               {slots.map((slot) => (
                 <button
                   key={slot}
@@ -148,15 +190,36 @@ export default function QuickActions({
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground mb-1 block">Cliente</span>
-            <input value={clientName} onChange={(e) => setClientName(e.target.value)} className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground mb-1 block">WhatsApp</span>
-            <input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="(27) 99999-0000" className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              placeholder="(27) 99999-0000"
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
-          {error && <p className="text-destructive text-sm sm:col-span-2">{error}</p>}
+          {error && (
+            <p className="text-destructive text-sm sm:col-span-2">{error}</p>
+          )}
           <div className="sm:col-span-2">
-            <Button disabled={isPending || !serviceId || !date || !time || !clientName.trim() || !clientPhone.trim()} onClick={saveBooking}>
+            <Button
+              disabled={
+                isPending ||
+                !serviceId ||
+                !date ||
+                !time ||
+                !clientName.trim() ||
+                !clientPhone.trim()
+              }
+              onClick={saveBooking}
+            >
               {isPending ? "Salvando…" : "Salvar agendamento"}
             </Button>
           </div>
@@ -167,23 +230,48 @@ export default function QuickActions({
         <div className="bg-card mt-3 grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
           <label className="text-xs sm:col-span-2">
             <span className="text-muted-foreground mb-1 block">Data</span>
-            <input type="date" value={blockDate} onChange={(e) => setBlockDate(e.target.value)} className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              type="date"
+              value={blockDate}
+              onChange={(e) => setBlockDate(e.target.value)}
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground mb-1 block">Início</span>
-            <input type="time" value={blockStart} onChange={(e) => setBlockStart(e.target.value)} className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              type="time"
+              value={blockStart}
+              onChange={(e) => setBlockStart(e.target.value)}
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
           <label className="text-xs">
             <span className="text-muted-foreground mb-1 block">Fim</span>
-            <input type="time" value={blockEnd} onChange={(e) => setBlockEnd(e.target.value)} className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              type="time"
+              value={blockEnd}
+              onChange={(e) => setBlockEnd(e.target.value)}
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
           <label className="text-xs sm:col-span-2">
             <span className="text-muted-foreground mb-1 block">Motivo (opcional)</span>
-            <input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Ex: compromisso" className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm" />
+            <input
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="Ex: compromisso"
+              className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+            />
           </label>
-          {error && <p className="text-destructive text-sm sm:col-span-2">{error}</p>}
+          {error && (
+            <p className="text-destructive text-sm sm:col-span-2">{error}</p>
+          )}
           <div className="sm:col-span-2">
-            <Button disabled={isPending || !blockDate || !blockStart || !blockEnd} onClick={saveBlock}>
+            <Button
+              disabled={isPending || !blockDate || !blockStart || !blockEnd}
+              onClick={saveBlock}
+            >
               {isPending ? "Bloqueando…" : "Bloquear período"}
             </Button>
           </div>
