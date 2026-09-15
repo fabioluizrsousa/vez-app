@@ -30,12 +30,14 @@ export default function QuickActions({
   const [time, setTime] = useState("")
   const [clientName, setClientName] = useState("")
   const [clientPhone, setClientPhone] = useState("")
+  const [sendWhatsApp, setSendWhatsApp] = useState(true)
 
   const [blockDate, setBlockDate] = useState("")
   const [blockStart, setBlockStart] = useState("")
   const [blockEnd, setBlockEnd] = useState("")
   const [blockReason, setBlockReason] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   const phoneValid = isValidWhatsAppBR(clientPhone)
   const showPhoneError = clientPhone.length > 0 && !phoneValid
@@ -71,6 +73,7 @@ export default function QuickActions({
   function toggleBooking() {
     const opening = mode !== "booking"
     setError(null)
+    setNotice(null)
     if (!opening) {
       setMode(null)
       return
@@ -82,17 +85,20 @@ export default function QuickActions({
   function toggleBlock() {
     setMode(mode === "block" ? null : "block")
     setError(null)
+    setNotice(null)
   }
 
   function saveBooking() {
     if (!serviceId || !date || !time || !clientName.trim() || !phoneValid) return
     setError(null)
+    setNotice(null)
     startTransition(async () => {
       const result = await createProfessionalBooking({
         serviceId,
         dateISO: `${date}T${time}:00`,
         clientName,
         clientPhone,
+        sendConfirmation: sendWhatsApp,
       })
       if (!result.ok) {
         setError(result.error)
@@ -104,6 +110,13 @@ export default function QuickActions({
       setSlots([])
       setClientName("")
       setClientPhone("")
+      setSendWhatsApp(true)
+      setNotice(
+        result.warning ??
+          (sendWhatsApp && result.whatsappSent
+            ? "Agendamento criado e confirmação enviada pelo WhatsApp."
+            : "Agendamento criado."),
+      )
       router.refresh()
     })
   }
@@ -111,6 +124,7 @@ export default function QuickActions({
   function saveBlock() {
     if (!blockDate || !blockStart || !blockEnd) return
     setError(null)
+    setNotice(null)
     startTransition(async () => {
       const result = await createManualBlock({
         startISO: `${blockDate}T${blockStart}:00`,
@@ -139,6 +153,10 @@ export default function QuickActions({
         <Button onClick={toggleBooking}>+ Novo agendamento</Button>
         <Button variant="outline" onClick={toggleBlock}>Bloquear horário</Button>
       </div>
+
+      {notice && (
+        <p className="mt-3 rounded-md border px-3 py-2 text-sm">{notice}</p>
+      )}
 
       {mode === "booking" && (
         <div className="bg-card mt-3 grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
@@ -214,6 +232,20 @@ export default function QuickActions({
                 Informe um celular válido com DDD.
               </span>
             )}
+          </label>
+          <label className="flex items-start gap-2 rounded-md border p-3 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={sendWhatsApp}
+              onChange={(e) => setSendWhatsApp(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <strong className="block font-medium">Enviar confirmação pelo WhatsApp</strong>
+              <span className="text-muted-foreground text-xs">
+                Inclui data, horário, calendário e link de cancelamento.
+              </span>
+            </span>
           </label>
           {error && (
             <p className="text-destructive text-sm sm:col-span-2">{error}</p>
