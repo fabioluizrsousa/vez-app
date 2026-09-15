@@ -18,19 +18,19 @@ export default function StatTile({
   const isPositive = typeof deltaPct === "number" && deltaPct >= 0
 
   return (
-    <div className="border-border bg-card rounded-lg border px-4 py-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground text-[11px] tracking-wide uppercase">
+    <div className="border-border bg-card rounded-lg border px-3 py-3 sm:px-4 sm:py-3.5">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <p className="text-muted-foreground text-[10px] leading-tight tracking-wide uppercase sm:text-[11px]">
             {label}
           </p>
-          <p className="mt-0.5 text-2xl font-semibold">{value}</p>
+          <p className="mt-1 text-xl font-semibold sm:mt-0.5 sm:text-2xl">{value}</p>
         </div>
         {sparkline && sparkline.length > 1 && <Sparkline values={sparkline} />}
       </div>
 
       {hasDelta && (
-        <p className="text-muted-foreground mt-1.5 font-mono text-xs tabular-nums">
+        <p className="text-muted-foreground mt-1.5 font-mono text-[11px] leading-tight tabular-nums sm:text-xs">
           {isNew ? (
             "Novo"
           ) : (
@@ -57,7 +57,7 @@ function Sparkline({ values }: { values: number[] }) {
       width={width}
       height={height}
       aria-hidden
-      className="mt-0.5 shrink-0"
+      className="mt-0.5 hidden shrink-0 sm:block"
     >
       {values.map((v, i) => {
         const barHeight = Math.max((v / max) * height, v > 0 ? 3 : 1)

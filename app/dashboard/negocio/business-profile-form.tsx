@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { Copy, ExternalLink, MessageCircle } from "lucide-react"
 import { updateBusinessProfile } from "../../_actions/update-business-profile"
 import { Button } from "../../_components/ui/button"
 import { Input } from "../../_components/ui/input"
@@ -33,6 +34,7 @@ export default function BusinessProfileForm({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const [businessName, setBusinessName] = useState(initial.businessName)
   const [phone, setPhone] = useState(initial.phone)
@@ -43,6 +45,40 @@ export default function BusinessProfileForm({
   const [googleReviewUrl, setGoogleReviewUrl] = useState(initial.googleReviewUrl)
   const [image, setImage] = useState<string | null>(initial.image)
   const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl)
+
+  const publicPath = slug ? `/${slug}` : null
+  const publicDisplayUrl = slug
+    ? `${siteHost.replace(/^https?:\/\//, "").replace(/\/$/, "")}/${slug}`
+    : null
+
+  function getAbsolutePublicUrl() {
+    if (!publicPath || typeof window === "undefined") return null
+    return new URL(publicPath, window.location.origin).toString()
+  }
+
+  async function handleCopyPublicUrl() {
+    const publicUrl = getAbsolutePublicUrl()
+    if (!publicUrl) return
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError("Não foi possível copiar o link. Tente novamente.")
+    }
+  }
+
+  function handleShareWhatsApp() {
+    const publicUrl = getAbsolutePublicUrl()
+    if (!publicUrl) return
+    const label = businessName.trim() || "meu negócio"
+    const text = `Agende seu horário em ${label}: ${publicUrl}`
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    )
+  }
 
   function handleSave() {
     setError(null)
@@ -69,98 +105,163 @@ export default function BusinessProfileForm({
     })
   }
 
+  const sectionClass = "border-border bg-card rounded-xl border p-4 sm:p-5"
+  const sectionTitleClass = "font-display text-sm font-extrabold uppercase tracking-wide"
+  const sectionHintClass = "text-muted-foreground mt-1 text-xs"
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-5 sm:flex-row sm:gap-8">
-        <ImageUploadField
-          label="Foto de perfil"
-          helperText="Se não enviar, usamos a foto da sua conta Google."
-          value={image}
-          onChange={setImage}
-          shape="circle"
-        />
-        <ImageUploadField
-          label="Logo do negócio"
-          helperText="Aparece na sua página pública, pro cliente."
-          value={logoUrl}
-          onChange={setLogoUrl}
-          shape="square"
-        />
-      </div>
+      <section className={sectionClass}>
+        <div className="mb-4">
+          <h2 className={sectionTitleClass}>Identidade</h2>
+          <p className={sectionHintClass}>Como seu negócio aparece para o cliente.</p>
+        </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="businessName">Nome do negócio</Label>
-        <Input
-          id="businessName"
-          value={businessName}
-          onChange={(e) => setBusinessName(e.target.value)}
-          placeholder="Ex: Renato Cortes"
-        />
-        {slug && (
-          <p className="text-muted-foreground font-mono text-xs">
-            {siteHost}/{slug}
+        <div className="flex flex-col gap-5 sm:flex-row sm:gap-8">
+          <ImageUploadField
+            label="Foto de perfil"
+            helperText="Se não enviar, usamos a foto da sua conta Google."
+            value={image}
+            onChange={setImage}
+            shape="circle"
+          />
+          <ImageUploadField
+            label="Logo do negócio"
+            helperText="Aparece na sua página pública, pro cliente."
+            value={logoUrl}
+            onChange={setLogoUrl}
+            shape="square"
+          />
+        </div>
+
+        <div className="mt-5 flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor="businessName">Nome do negócio</Label>
+          <Input
+            id="businessName"
+            value={businessName}
+            onChange={(e) => setBusinessName(e.target.value)}
+            placeholder="Ex: Renato Cortes"
+          />
+        </div>
+      </section>
+
+      {publicPath && publicDisplayUrl && (
+        <section className={sectionClass}>
+          <div className="mb-3">
+            <h2 className={sectionTitleClass}>Página pública</h2>
+            <p className={sectionHintClass}>Envie este link para o cliente fazer a própria reserva.</p>
+          </div>
+
+          <p
+            className="bg-secondary text-muted-foreground max-w-full truncate rounded-md px-3 py-2 font-mono text-xs"
+            title={publicDisplayUrl}
+          >
+            {publicDisplayUrl}
           </p>
-        )}
-      </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="phone">WhatsApp</Label>
-        <Input
-          id="phone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="(27) 99999-0000"
-        />
-      </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleCopyPublicUrl}
+              className="border-input hover:bg-secondary inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-xs font-semibold"
+            >
+              <Copy className="size-4" />
+              {copied ? "Link copiado" : "Copiar link"}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className="border-input hover:bg-secondary inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-xs font-semibold"
+            >
+              <MessageCircle className="size-4" />
+              Compartilhar WhatsApp
+            </button>
+            <a
+              href={publicPath}
+              target="_blank"
+              rel="noreferrer"
+              className="border-input hover:bg-secondary inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-xs font-semibold"
+            >
+              <ExternalLink className="size-4" />
+              Ver como cliente
+            </a>
+          </div>
+        </section>
+      )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="address">Endereço</Label>
-        <Input
-          id="address"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="Rua, número — bairro"
-        />
-      </div>
+      <section className={sectionClass}>
+        <div className="mb-4">
+          <h2 className={sectionTitleClass}>Contato</h2>
+          <p className={sectionHintClass}>Informações que o cliente usa para falar com você e chegar ao local.</p>
+        </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="cancellationWindowHours">
-          Cancelamento até quantas horas antes?
-        </Label>
-        <Input
-          id="cancellationWindowHours"
-          type="number"
-          min={0}
-          className="w-24"
-          value={cancellationWindowHours}
-          onChange={(e) => setCancellationWindowHours(e.target.value)}
-        />
-      </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="phone">WhatsApp</Label>
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(27) 99999-0000"
+            />
+          </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="googleReviewUrl">Link de avaliação no Google</Label>
-        <Input
-          id="googleReviewUrl"
-          value={googleReviewUrl}
-          onChange={(e) => setGoogleReviewUrl(e.target.value)}
-          placeholder="https://g.page/r/.../review"
-        />
-        <p className="text-muted-foreground text-xs">
-          Aparece como botão na sua página e na mensagem pós-atendimento. Pra
-          achar o seu: procure seu negócio no Google, clique em &quot;Peça
-          avaliações&quot; e copie o link.
-        </p>
-      </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="address">Endereço</Label>
+            <Input
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Rua, número — bairro"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className={sectionClass}>
+        <div className="mb-4">
+          <h2 className={sectionTitleClass}>Regras e reputação</h2>
+          <p className={sectionHintClass}>Política de cancelamento e avaliação pós-atendimento.</p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cancellationWindowHours">
+              Cancelamento até quantas horas antes?
+            </Label>
+            <Input
+              id="cancellationWindowHours"
+              type="number"
+              min={0}
+              value={cancellationWindowHours}
+              onChange={(e) => setCancellationWindowHours(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="googleReviewUrl">Link de avaliação no Google</Label>
+            <Input
+              id="googleReviewUrl"
+              value={googleReviewUrl}
+              onChange={(e) => setGoogleReviewUrl(e.target.value)}
+              placeholder="https://g.page/r/.../review"
+            />
+            <p className="text-muted-foreground text-xs">
+              Use o link de “Peça avaliações” do seu Perfil da Empresa no Google.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
       {saved && <p className="text-success text-sm">Salvo.</p>}
 
       <Button
-        className="self-start"
+        className="min-h-11 self-start px-6"
         disabled={isPending || !businessName.trim()}
         onClick={handleSave}
       >
-        {isPending ? "Salvando…" : redirectTo ? "Continuar" : "Salvar"}
+        {isPending ? "Salvando…" : redirectTo ? "Continuar" : "Salvar alterações"}
       </Button>
     </div>
   )

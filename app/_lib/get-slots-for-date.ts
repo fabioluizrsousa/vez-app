@@ -2,24 +2,14 @@ import { endOfDay, startOfDay } from "date-fns"
 import type { Prisma, PrismaClient } from "@prisma/client"
 import { getAvailableSlots } from "./slots"
 
-// Aceita tanto o client normal (`db`) quanto um client de transação
-// (`tx` dentro de `db.$transaction(async (tx) => ...)`) — é por isso que
-// essa lógica não vive direto em get-available-slots.ts (que é "use server"
-// e não pode ganhar um parâmetro extra não serializável sem risco de quebrar
-// a chamada como Server Action a partir do client).
 type QueryClient = PrismaClient | Prisma.TransactionClient
 
-/**
- * Busca o serviço (já validando que pertence a esse profissional e está
- * ativo — sem isso dava pra agendar o serviço de outro profissional, ou um
- * serviço pausado, chamando a Server Action direto) e calcula os horários
- * livres do dia pra ele.
- */
 export async function computeSlotsForDate(
   client: QueryClient,
   professionalId: string,
   serviceId: string,
   dateISO: string,
+  excludeBookingId?: string,
 ) {
   const date = new Date(dateISO)
 
@@ -40,6 +30,7 @@ export async function computeSlotsForDate(
         professionalId,
         status: "CONFIRMED",
         scheduledAt: { gte: startOfDay(date), lte: endOfDay(date) },
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
       },
       include: { service: true },
     }),

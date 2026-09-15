@@ -21,8 +21,6 @@ import type { BookingStatus } from "@prisma/client"
 import { db } from "../_lib/prisma"
 
 export type DashboardPeriod = "day" | "week" | "month" | "year"
-
-// Bucket usado pra série de barras (semana/mês/ano) — cada item vira uma barra.
 export type DashboardSeriesPoint = { label: string; value: number }
 
 export type DashboardBooking = {
@@ -30,7 +28,18 @@ export type DashboardBooking = {
   scheduledAt: Date
   clientName: string
   status: BookingStatus
-  service: { name: string; price: { toString(): string } }
+  service: {
+    name: string
+    price: { toString(): string }
+    durationMinutes: number
+  }
+}
+
+export type DashboardManualBlock = {
+  id: string
+  startAt: Date
+  endAt: Date
+  reason: string | null
 }
 
 type KpiValue = { value: number; deltaPct: number | null }
@@ -42,6 +51,7 @@ type DayDashboardData = {
   kpis: Kpis
   sparkline: number[]
   bookings: DashboardBooking[]
+  manualBlocks: DashboardManualBlock[]
 }
 
 type SeriesDashboardData = {
@@ -60,10 +70,7 @@ function getRange(period: DashboardPeriod, ref: Date) {
     case "day":
       return { start: startOfDay(ref), end: endOfDay(ref) }
     case "week":
-      return {
-        start: startOfWeek(ref, WEEK_OPTS),
-        end: endOfWeek(ref, WEEK_OPTS),
-      }
+      return { start: startOfWeek(ref, WEEK_OPTS), end: endOfWeek(ref, WEEK_OPTS) }
     case "month":
       return { start: startOfMonth(ref), end: endOfMonth(ref) }
     case "year":
@@ -73,14 +80,10 @@ function getRange(period: DashboardPeriod, ref: Date) {
 
 function getPreviousRef(period: DashboardPeriod, ref: Date) {
   switch (period) {
-    case "day":
-      return subDays(ref, 1)
-    case "week":
-      return subWeeks(ref, 1)
-    case "month":
-      return subMonths(ref, 1)
-    case "year":
-      return subYears(ref, 1)
+    case "day": return subDays(ref, 1)
+    case "week": return subWeeks(ref, 1)
+    case "month": return subMonths(ref, 1)
+    case "year": return subYears(ref, 1)
   }
 }
 
@@ -94,8 +97,6 @@ function countActive(bookings: { status: BookingStatus }[]) {
   return bookings.filter((b) => b.status !== "CANCELED").length
 }
 
-// null = sem base de comparação (período anterior zerado) — o StatTile mostra
-// "Novo" nesse caso em vez de uma % sem sentido (divisão por zero).
 function deltaPct(current: number, previous: number): number | null {
   if (previous === 0) return current === 0 ? 0 : null
   return ((current - previous) / previous) * 100
@@ -106,24 +107,15 @@ function stripTrailingDot(s: string) {
 }
 
 function formatRangeLabel(period: DashboardPeriod, ref: Date) {
-  if (period === "day") {
-    return format(ref, "EEE, d 'de' MMM.", { locale: ptBR })
-  }
+  if (period === "day") return format(ref, "EEE, d 'de' MMM.", { locale: ptBR })
   if (period === "week") {
     const { start, end } = getRange("week", ref)
     return `${format(start, "d 'de' MMM.", { locale: ptBR })} – ${format(end, "d 'de' MMM.", { locale: ptBR })}`
   }
-  if (period === "month") {
-    return format(ref, "MMMM 'de' yyyy", { locale: ptBR })
-  }
+  if (period === "month") return format(ref, "MMMM 'de' yyyy", { locale: ptBR })
   return format(ref, "yyyy")
 }
 
-/**
- * Dados prontos pra Agenda do dashboard: KPIs (com variação vs. período
- * anterior) e, dependendo do período, a linha do tempo do dia ou uma série
- * pra gráfico de barras (semana = por dia, mês = por semana, ano = por mês).
- */
 export async function getDashboardData(
   professionalId: string,
   period: DashboardPeriod,
@@ -136,7 +128,11 @@ export async function getDashboardData(
   const [currentBookings, previousBookings] = await Promise.all([
     db.booking.findMany({
       where: { professionalId, scheduledAt: { gte: start, lte: end } },
-      include: { service: { select: { name: true, price: true } } },
+      include: {
+        service: {
+          select: { name: true, price: true, durationMinutes: true },
+        },
+      },
       orderBy: { scheduledAt: "asc" },
     }),
     db.booking.findMany({
@@ -158,15 +154,26 @@ export async function getDashboardData(
   const rangeLabel = formatRangeLabel(period, referenceDate)
 
   if (period === "day") {
+    const [sparklineBookings, manualBlocks] = await Promise.all([
+      db.booking.findMany({
+        where: {
+          professionalId,
+          status: "COMPLETED",
+          scheduledAt: { gte: startOfDay(subDays(referenceDate, 6)), lte: end },
+        },
+        select: { scheduledAt: true, service: { select: { price: true } } },
+      }),
+      db.manualBlock.findMany({
+        where: {
+          professionalId,
+          startAt: { lte: end },
+          endAt: { gte: start },
+        },
+        orderBy: { startAt: "asc" },
+      }),
+    ])
+
     const sparklineStart = startOfDay(subDays(referenceDate, 6))
-    const sparklineBookings = await db.booking.findMany({
-      where: {
-        professionalId,
-        status: "COMPLETED",
-        scheduledAt: { gte: sparklineStart, lte: end },
-      },
-      select: { scheduledAt: true, service: { select: { price: true } } },
-    })
     const days = eachDayOfInterval({ start: sparklineStart, end })
     const sparkline = days.map((day) => {
       const dayStart = startOfDay(day).getTime()
@@ -175,20 +182,13 @@ export async function getDashboardData(
         .reduce((sum, b) => sum + Number(b.service.price), 0)
     })
 
-    return { period, rangeLabel, kpis, sparkline, bookings: currentBookings }
+    return { period, rangeLabel, kpis, sparkline, bookings: currentBookings, manualBlocks }
   }
 
   let buckets: { key: number; label: string }[]
-
-  function weekBucketKey(scheduledAt: Date) {
-    return startOfDay(scheduledAt).getTime()
-  }
-  function monthBucketKey(scheduledAt: Date) {
-    return startOfWeek(scheduledAt, WEEK_OPTS).getTime()
-  }
-  function yearBucketKey(scheduledAt: Date) {
-    return startOfMonth(scheduledAt).getTime()
-  }
+  const weekBucketKey = (d: Date) => startOfDay(d).getTime()
+  const monthBucketKey = (d: Date) => startOfWeek(d, WEEK_OPTS).getTime()
+  const yearBucketKey = (d: Date) => startOfMonth(d).getTime()
 
   if (period === "week") {
     buckets = eachDayOfInterval({ start, end }).map((d) => ({
@@ -196,8 +196,6 @@ export async function getDashboardData(
       label: stripTrailingDot(format(d, "EEE", { locale: ptBR })),
     }))
   } else if (period === "month") {
-    // Rótulo é o dia de início de cada semana (ex: "1/9", "8/9") em vez de
-    // "Semana 1/2/3" — número de semana sem a data junto não dizia muito.
     buckets = eachWeekOfInterval({ start, end }, WEEK_OPTS).map((d) => ({
       key: startOfWeek(d, WEEK_OPTS).getTime(),
       label: format(startOfWeek(d, WEEK_OPTS), "d/MM"),
@@ -209,13 +207,7 @@ export async function getDashboardData(
     }))
   }
 
-  const bucketKeyOf =
-    period === "week"
-      ? weekBucketKey
-      : period === "month"
-        ? monthBucketKey
-        : yearBucketKey
-
+  const bucketKeyOf = period === "week" ? weekBucketKey : period === "month" ? monthBucketKey : yearBucketKey
   const completed = currentBookings.filter((b) => b.status === "COMPLETED")
   const series: DashboardSeriesPoint[] = buckets.map(({ key, label }) => ({
     label,

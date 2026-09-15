@@ -10,6 +10,7 @@ import { createBooking } from "../../_actions/create-booking"
 import { formatBRL, formatDuration } from "../../_lib/format"
 import { toLocalISO } from "../../_lib/datetime"
 import { cn } from "../../_lib/utils"
+import { formatWhatsAppBR, isValidWhatsAppBR } from "../../_lib/phone"
 import { Button } from "../../_components/ui/button"
 
 interface Service {
@@ -45,6 +46,8 @@ export default function BookingWizard({
   const [clientPhone, setClientPhone] = useState("")
   const [error, setError] = useState<string | null>(null)
 
+  const phoneIsValid = isValidWhatsAppBR(clientPhone)
+
   const days = useMemo(
     () => Array.from({ length: NEXT_DAYS }, (_, i) => addDays(new Date(), i)),
     [],
@@ -72,6 +75,10 @@ export default function BookingWizard({
 
   function handleConfirm() {
     if (!selectedTime) return
+    if (!phoneIsValid) {
+      setError("Informe um WhatsApp válido com DDD.")
+      return
+    }
     setError(null)
 
     const [h, m] = selectedTime.split(":").map(Number)
@@ -212,10 +219,27 @@ export default function BookingWizard({
             </span>
             <input
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
+              onChange={(e) => {
+                setClientPhone(formatWhatsAppBR(e.target.value))
+                if (error === "Informe um WhatsApp válido com DDD.") setError(null)
+              }}
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={15}
               placeholder="(27) 99999-0000"
-              className="border-input bg-background w-full rounded-lg border px-3 py-2.5 text-sm"
+              aria-invalid={clientPhone.length > 0 && !phoneIsValid}
+              className={cn(
+                "bg-background w-full rounded-lg border px-3 py-2.5 text-sm",
+                clientPhone.length > 0 && !phoneIsValid
+                  ? "border-destructive"
+                  : "border-input",
+              )}
             />
+            {clientPhone.length > 0 && !phoneIsValid && (
+              <span className="text-destructive mt-1.5 block text-xs">
+                Informe um celular válido com DDD, por exemplo (27) 99999-0000.
+              </span>
+            )}
           </label>
 
           <p className="text-muted-foreground mb-2 font-mono text-[10.5px] tracking-wide uppercase">
@@ -246,7 +270,7 @@ export default function BookingWizard({
             <Button
               className="w-full"
               size="lg"
-              disabled={isPending || !clientName.trim() || !clientPhone.trim()}
+              disabled={isPending || !clientName.trim() || !phoneIsValid}
               onClick={handleConfirm}
             >
               {isPending ? "Confirmando…" : "Confirmar Agendamento"}

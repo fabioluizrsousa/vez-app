@@ -17,7 +17,7 @@ export default function PeriodSwitcher({ active }: { active: DashboardPeriod }) 
           key={option.value}
           href={option.value === "day" ? "/dashboard" : `/dashboard?periodo=${option.value}`}
           className={cn(
-            "rounded-md px-3 py-1.5 font-mono text-xs tracking-wide uppercase transition-colors",
+            "rounded-md px-2 py-1.5 font-mono text-[11px] tracking-wide uppercase transition-colors sm:px-3 sm:text-xs",
             active === option.value
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",

@@ -15,8 +15,6 @@ interface CreateBookingInput {
   clientPhone: string
 }
 
-// Erro "esperado" (serviço inválido / horário ocupado) — distingue de um
-// erro de infra de verdade no catch lá embaixo.
 class BookingRejected extends Error {}
 
 export async function createBooking(input: CreateBookingInput) {
@@ -26,25 +24,22 @@ export async function createBooking(input: CreateBookingInput) {
     return { ok: false as const, error: "Preencha nome e WhatsApp." }
   }
 
+  const clientE164 = toWhatsAppE164BR(clientPhone)
+  if (!clientE164) {
+    return {
+      ok: false as const,
+      error: "Informe um WhatsApp válido com DDD.",
+    }
+  }
+
   const scheduledAt = new Date(dateISO)
   const hh = String(scheduledAt.getHours()).padStart(2, "0")
   const mm = String(scheduledAt.getMinutes()).padStart(2, "0")
 
   let booking
   try {
-    // Isolamento Serializable: a checagem de horário livre e a criação do
-    // agendamento acontecem como se fossem a única coisa rodando no banco
-    // nesse instante. Se duas pessoas confirmarem o mesmo horário ao mesmo
-    // tempo, o Postgres deixa uma das duas transações completar e força a
-    // outra a falhar (em vez das duas passarem pela checagem antes de
-    // qualquer uma ter inserido, que é a corrida que só reconferir os slots
-    // antes do create — sem transação — não fecha).
     booking = await db.$transaction(
       async (tx) => {
-        // Também valida que o serviço é desse profissional e está ativo —
-        // sem isso dava pra chamar essa action direto com o serviceId de
-        // outro profissional (ou de um serviço pausado) e criar um
-        // agendamento com duração/preço de um serviço que não é esse.
         const { service, slots } = await computeSlotsForDate(
           tx,
           professionalId,
@@ -78,9 +73,6 @@ export async function createBooking(input: CreateBookingInput) {
     if (error instanceof BookingRejected) {
       return { ok: false as const, error: error.message }
     }
-    // Conflito de serialização do Postgres (a corrida de verdade entre duas
-    // transações concorrentes) também cai aqui — pro cliente, é o mesmo
-    // "esse horário acabou de ser preenchido".
     console.error("Falha ao criar agendamento:", error)
     return {
       ok: false as const,
@@ -88,16 +80,15 @@ export async function createBooking(input: CreateBookingInput) {
     }
   }
 
-  // Aviso via WhatsApp Business Platform (Meta Cloud API) pro barbeiro e
-  // confirmação pro cliente — nunca deve derrubar a criação do agendamento
-  // em si (já concluída acima), por isso tudo aqui é best-effort dentro de
-  // um try/catch. Sem WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID no
-  // .env, sendWhatsAppTemplate só retorna skipped:true e nada é enviado —
-  // ver README para o passo a passo de configuração na Meta e o texto dos
-  // templates que precisam estar aprovados lá.
   try {
     const siteUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "")
-    const calendarUrl = `${siteUrl}/api/bookings/${booking.id}/calendar`
+    const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    const publicUrl = (
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (productionHost ? `https://${productionHost}` : siteUrl)
+    ).replace(/\/$/, "")
+    const calendarUrl = `${publicUrl}/api/bookings/${booking.id}/calendar`
+    const cancelUrl = `${publicUrl}/cancelar/${booking.cancelToken}`
     const dashboardUrl = `${siteUrl}/dashboard`
     const dateLabel = format(booking.scheduledAt, "EEE d/MM", { locale: ptBR })
     const timeLabel = format(booking.scheduledAt, "HH:mm")
@@ -135,32 +126,44 @@ export async function createBooking(input: CreateBookingInput) {
       }
     }
 
-    const clientE164 = toWhatsAppE164BR(clientPhone)
-    if (clientE164) {
-      const result = await sendWhatsAppTemplate({
+    const cancellationTemplate =
+      process.env.WHATSAPP_TEMPLATE_CLIENTE_CANCELAMENTO ??
+      "confirmacao_agendamento_cliente_cancelamento"
+
+    let clientResult = await sendWhatsAppTemplate({
+      to: clientE164,
+      templateName: cancellationTemplate,
+      params: [businessName, dateLabel, timeLabel, calendarUrl, cancelUrl],
+    })
+
+    if (!clientResult.ok && !clientResult.skipped) {
+      console.error(
+        "Falha no template com cancelamento; tentando template anterior:",
+        clientResult.error,
+      )
+      clientResult = await sendWhatsAppTemplate({
         to: clientE164,
         templateName:
           process.env.WHATSAPP_TEMPLATE_CLIENTE ??
           "confirmacao_agendamento_cliente",
         params: [businessName, dateLabel, timeLabel, calendarUrl],
       })
-      if (!result.ok && !result.skipped) {
-        console.error("Falha ao notificar cliente no WhatsApp:", result.error)
-      }
-      if (!result.skipped) {
-        await db.reminderLog.create({
-          data: {
-            bookingId: booking.id,
-            channel: "WHATSAPP",
-            status: result.ok ? "SENT" : "FAILED",
-          },
-        })
-      }
-    } else {
+    }
+
+    if (!clientResult.ok && !clientResult.skipped) {
       console.error(
-        "Aviso ao cliente pulado — telefone não reconhecido:",
-        clientPhone,
+        "Falha ao notificar cliente no WhatsApp:",
+        clientResult.error,
       )
+    }
+    if (!clientResult.skipped) {
+      await db.reminderLog.create({
+        data: {
+          bookingId: booking.id,
+          channel: "WHATSAPP",
+          status: clientResult.ok ? "SENT" : "FAILED",
+        },
+      })
     }
   } catch (error) {
     console.error("Falha ao enviar aviso de WhatsApp:", error)
