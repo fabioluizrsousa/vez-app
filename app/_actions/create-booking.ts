@@ -82,8 +82,13 @@ export async function createBooking(input: CreateBookingInput) {
 
   try {
     const siteUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "")
-    const calendarUrl = `${siteUrl}/api/bookings/${booking.id}/calendar`
-    const cancelUrl = `${siteUrl}/cancelar/${booking.cancelToken}`
+    const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    const publicUrl = (
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (productionHost ? `https://${productionHost}` : siteUrl)
+    ).replace(/\/$/, "")
+    const calendarUrl = `${publicUrl}/api/bookings/${booking.id}/calendar`
+    const cancelUrl = `${publicUrl}/cancelar/${booking.cancelToken}`
     const dashboardUrl = `${siteUrl}/dashboard`
     const dateLabel = format(booking.scheduledAt, "EEE d/MM", { locale: ptBR })
     const timeLabel = format(booking.scheduledAt, "HH:mm")
