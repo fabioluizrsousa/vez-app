@@ -1,11 +1,13 @@
-import { isValid, parse } from "date-fns"
+import { format, isValid, parse } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { Clock3 } from "lucide-react"
 import { requireProfessional } from "../_lib/current-professional"
 import { db } from "../_lib/prisma"
 import {
   getDashboardData,
   type DashboardPeriod,
 } from "../_data/get-dashboard-data"
-import { formatBRL } from "../_lib/format"
+import { formatBRL, formatDuration } from "../_lib/format"
 import PeriodSwitcher from "./_components/period-switcher"
 import DateNav from "./_components/date-nav"
 import StatTile from "./_components/stat-tile"
@@ -78,6 +80,33 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         ].join("|")
       : `${period}:${referenceDate.toISOString()}`
 
+  const now = new Date()
+  const nextBooking =
+    dashboardData.period === "day" && isToday
+      ? dashboardData.bookings.find((booking) => {
+          if (booking.status !== "CONFIRMED") return false
+          const endsAt = new Date(
+            booking.scheduledAt.getTime() + booking.service.durationMinutes * 60_000,
+          )
+          return endsAt > now
+        })
+      : null
+
+  const nextBookingTiming = nextBooking
+    ? nextBooking.scheduledAt <= now
+      ? "Agora"
+      : (() => {
+          const minutes = Math.max(
+            1,
+            Math.round((nextBooking.scheduledAt.getTime() - now.getTime()) / 60_000),
+          )
+          if (minutes < 60) return `em ${minutes} min`
+          const hours = Math.floor(minutes / 60)
+          const rest = minutes % 60
+          return rest === 0 ? `em ${hours}h` : `em ${hours}h ${rest}min`
+        })()
+    : null
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -99,7 +128,39 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         services={services}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      {dashboardData.period === "day" && isToday && (
+        <div className="border-border bg-card mb-4 rounded-xl border p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-muted-foreground mb-1 font-mono text-[10px] tracking-wide uppercase sm:text-[11px]">
+                Próximo atendimento
+              </p>
+              {nextBooking ? (
+                <>
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <p className="truncate text-base font-semibold sm:text-lg">
+                      {nextBooking.clientName}
+                    </p>
+                    <span className="text-primary font-mono text-xs font-semibold">
+                      {nextBookingTiming}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
+                    {format(nextBooking.scheduledAt, "HH:mm", { locale: ptBR })} · {nextBooking.service.name} · {formatDuration(nextBooking.service.durationMinutes)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm font-medium">Nenhum atendimento pendente hoje.</p>
+              )}
+            </div>
+            <div className="bg-secondary text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-11 sm:w-11">
+              <Clock3 className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-5 grid grid-cols-2 gap-2.5 sm:gap-3">
         <StatTile
           label={REVENUE_LABEL[period]}
           value={formatBRL(dashboardData.kpis.revenue.value)}
@@ -116,7 +177,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       </div>
 
       <p className="text-muted-foreground mb-3 font-mono text-[11px] tracking-wide uppercase">
-        {dashboardData.period === "day" ? "Linha do tempo" : "Faturamento no período"}
+        {dashboardData.period === "day" ? "Agenda do dia" : "Faturamento no período"}
       </p>
 
       {dashboardData.period === "day" ? (
