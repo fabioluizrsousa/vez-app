@@ -121,21 +121,29 @@ export async function createBooking(input: CreateBookingInput) {
       }
     }
 
-    // O template atual de produção usa 4 variáveis. Para adicionar o link de
-    // cancelamento sem quebrar mensagens já aprovadas na Meta, o novo template
-    // é ativado somente quando WHATSAPP_TEMPLATE_CLIENTE_CANCELAMENTO estiver
-    // configurado. Até lá, mantém exatamente o template antigo funcionando.
-    const cancelTemplate = process.env.WHATSAPP_TEMPLATE_CLIENTE_CANCELAMENTO
-    const clientResult = await sendWhatsAppTemplate({
+    const cancellationTemplate =
+      process.env.WHATSAPP_TEMPLATE_CLIENTE_CANCELAMENTO ??
+      "confirmacao_agendamento_cliente_cancelamento"
+
+    let clientResult = await sendWhatsAppTemplate({
       to: clientE164,
-      templateName:
-        cancelTemplate ??
-        process.env.WHATSAPP_TEMPLATE_CLIENTE ??
-        "confirmacao_agendamento_cliente",
-      params: cancelTemplate
-        ? [businessName, dateLabel, timeLabel, calendarUrl, cancelUrl]
-        : [businessName, dateLabel, timeLabel, calendarUrl],
+      templateName: cancellationTemplate,
+      params: [businessName, dateLabel, timeLabel, calendarUrl, cancelUrl],
     })
+
+    if (!clientResult.ok && !clientResult.skipped) {
+      console.error(
+        "Falha no template com cancelamento; tentando template anterior:",
+        clientResult.error,
+      )
+      clientResult = await sendWhatsAppTemplate({
+        to: clientE164,
+        templateName:
+          process.env.WHATSAPP_TEMPLATE_CLIENTE ??
+          "confirmacao_agendamento_cliente",
+        params: [businessName, dateLabel, timeLabel, calendarUrl],
+      })
+    }
 
     if (!clientResult.ok && !clientResult.skipped) {
       console.error(
