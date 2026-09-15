@@ -72,7 +72,7 @@ function getRange(period: DashboardPeriod, ref: Date) {
     case "week":
       return { start: startOfWeek(ref, WEEK_OPTS), end: endOfWeek(ref, WEEK_OPTS) }
     case "month":
-      return { start: startOfMonth(ref), end: endOfMonth(ref, WEEK_OPTS) }
+      return { start: startOfMonth(ref), end: endOfMonth(ref) }
     case "year":
       return { start: startOfYear(ref), end: endOfYear(ref) }
   }
