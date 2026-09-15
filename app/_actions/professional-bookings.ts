@@ -1,10 +1,13 @@
 "use server"
 
+import { format } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import { revalidatePath } from "next/cache"
 import { db } from "../_lib/prisma"
 import { requireProfessional } from "../_lib/current-professional"
 import { computeSlotsForDate } from "../_lib/get-slots-for-date"
-import { isValidWhatsAppBR } from "../_lib/phone"
+import { isValidWhatsAppBR, toWhatsAppE164BR } from "../_lib/phone"
+import { sendWhatsAppTemplate } from "../_lib/whatsapp"
 
 class BookingRejected extends Error {}
 
@@ -17,6 +20,7 @@ export async function createProfessionalBooking(input: {
   dateISO: string
   clientName: string
   clientPhone: string
+  sendConfirmation?: boolean
 }) {
   const professional = await requireProfessional()
   const scheduledAt = new Date(input.dateISO)
@@ -34,8 +38,9 @@ export async function createProfessionalBooking(input: {
     return { ok: false as const, error: "Data ou horário inválido." }
   }
 
+  let booking
   try {
-    await db.$transaction(
+    booking = await db.$transaction(
       async (tx) => {
         const { service, slots } = await computeSlotsForDate(
           tx,
@@ -49,7 +54,7 @@ export async function createProfessionalBooking(input: {
           throw new BookingRejected("Esse horário não está mais disponível.")
         }
 
-        await tx.booking.create({
+        return tx.booking.create({
           data: {
             professionalId: professional.id,
             serviceId: input.serviceId,
@@ -57,6 +62,7 @@ export async function createProfessionalBooking(input: {
             clientName: input.clientName.trim(),
             clientPhone: input.clientPhone.trim(),
           },
+          include: { service: true, professional: true },
         })
       },
       { isolationLevel: "Serializable" },
@@ -72,8 +78,73 @@ export async function createProfessionalBooking(input: {
     }
   }
 
+  let warning: string | undefined
+  let whatsappSent = false
+
+  if (input.sendConfirmation !== false) {
+    try {
+      const clientE164 = toWhatsAppE164BR(input.clientPhone)
+      const siteUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "")
+      const calendarUrl = `${siteUrl}/api/bookings/${booking.id}/calendar`
+      const cancelUrl = `${siteUrl}/cancelar/${booking.cancelToken}`
+      const dateLabel = format(booking.scheduledAt, "EEE d/MM", { locale: ptBR })
+      const timeLabel = format(booking.scheduledAt, "HH:mm")
+      const businessName =
+        booking.professional.businessName || booking.professional.name || "Vez"
+
+      if (!clientE164) {
+        warning = "Agendamento criado, mas o WhatsApp do cliente é inválido."
+      } else {
+        const cancellationTemplate =
+          process.env.WHATSAPP_TEMPLATE_CLIENTE_CANCELAMENTO ??
+          "confirmacao_agendamento_cliente_cancelamento"
+
+        let result = await sendWhatsAppTemplate({
+          to: clientE164,
+          templateName: cancellationTemplate,
+          params: [businessName, dateLabel, timeLabel, calendarUrl, cancelUrl],
+        })
+
+        if (!result.ok && !result.skipped) {
+          console.error(
+            "Falha no template manual com cancelamento; tentando template anterior:",
+            result.error,
+          )
+          result = await sendWhatsAppTemplate({
+            to: clientE164,
+            templateName:
+              process.env.WHATSAPP_TEMPLATE_CLIENTE ??
+              "confirmacao_agendamento_cliente",
+            params: [businessName, dateLabel, timeLabel, calendarUrl],
+          })
+        }
+
+        whatsappSent = result.ok
+        if (result.skipped) {
+          warning = "Agendamento criado, mas o WhatsApp não está configurado."
+        } else if (!result.ok) {
+          warning = "Agendamento criado, mas não foi possível enviar a confirmação."
+          console.error("Falha ao confirmar agendamento manual:", result.error)
+        }
+
+        if (!result.skipped) {
+          await db.reminderLog.create({
+            data: {
+              bookingId: booking.id,
+              channel: "WHATSAPP",
+              status: result.ok ? "SENT" : "FAILED",
+            },
+          })
+        }
+      }
+    } catch (error) {
+      warning = "Agendamento criado, mas não foi possível enviar a confirmação."
+      console.error("Falha ao enviar confirmação do agendamento manual:", error)
+    }
+  }
+
   revalidatePath("/dashboard")
-  return { ok: true as const }
+  return { ok: true as const, whatsappSent, warning }
 }
 
 export async function getRescheduleSlots(bookingId: string, dateISO: string) {
