@@ -6,10 +6,7 @@ import { updateBookingStatus } from "../_actions/update-booking-status"
 import { getRescheduleSlots, rescheduleBooking } from "../_actions/professional-bookings"
 
 const ACTION_CLASS =
-  "inline-flex h-5 items-center p-0 font-mono text-[10.5px] leading-none uppercase text-muted-foreground"
-
-const SEPARATOR_CLASS =
-  "text-border inline-flex h-5 items-center font-mono text-[10.5px] leading-none"
+  "inline-flex min-h-8 items-center justify-center rounded-md border border-input px-2.5 py-1 font-mono text-[10px] font-medium uppercase text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
 
 export default function AgendaItemActions({
   bookingId,
@@ -65,51 +62,47 @@ export default function AgendaItemActions({
   }
 
   return (
-    <div className="flex max-w-[270px] flex-col items-end gap-2">
-      <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1">
+    <div className="flex w-full max-w-[360px] flex-col items-start gap-2 sm:items-end">
+      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
         <a
           href={`/api/bookings/${bookingId}/calendar`}
-          className={`${ACTION_CLASS} hover:text-foreground`}
+          className={ACTION_CLASS}
         >
-          Agenda
+          Calendário
         </a>
-        <span aria-hidden className={SEPARATOR_CLASS}>·</span>
         <button
           type="button"
           disabled={isPending}
           onClick={() => setShowReschedule((v) => !v)}
-          className={`${ACTION_CLASS} hover:text-foreground`}
+          className={ACTION_CLASS}
         >
           Reagendar
         </button>
         {canComplete && (
           <>
-            <span aria-hidden className={SEPARATOR_CLASS}>·</span>
             <button
               type="button"
               disabled={isPending}
               onClick={() => setStatus("COMPLETED")}
-              className={`${ACTION_CLASS} hover:text-success`}
+              className={`${ACTION_CLASS} hover:border-success hover:text-success`}
             >
               Concluir
             </button>
-            <span aria-hidden className={SEPARATOR_CLASS}>·</span>
             <button
               type="button"
               disabled={isPending}
               onClick={() => setStatus("NO_SHOW")}
-              className={`${ACTION_CLASS} hover:text-foreground`}
+              className={ACTION_CLASS}
             >
               Faltou
             </button>
           </>
         )}
-        <span aria-hidden className={SEPARATOR_CLASS}>·</span>
         <button
           type="button"
           disabled={isPending}
           onClick={() => setStatus("CANCELED")}
-          className={`${ACTION_CLASS} hover:text-destructive`}
+          className={`${ACTION_CLASS} hover:border-destructive hover:text-destructive`}
         >
           Cancelar
         </button>
@@ -121,9 +114,9 @@ export default function AgendaItemActions({
             type="date"
             value={date}
             onChange={(e) => loadDate(e.target.value)}
-            className="border-input bg-background w-full rounded border px-2 py-1.5 text-xs"
+            className="border-input bg-background w-full rounded border px-2 py-2 text-xs"
           />
-          <div className="mt-2 flex flex-wrap gap-1">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {isPending && date && (
               <span className="text-muted-foreground text-xs">Carregando…</span>
             )}
@@ -132,7 +125,7 @@ export default function AgendaItemActions({
                 key={slot}
                 type="button"
                 onClick={() => setTime(slot)}
-                className={`rounded-full border px-2 py-1 font-mono text-[10px] ${
+                className={`min-h-8 rounded-full border px-2.5 py-1 font-mono text-[10px] ${
                   time === slot ? "bg-foreground text-background" : "bg-background"
                 }`}
               >
@@ -145,7 +138,7 @@ export default function AgendaItemActions({
             type="button"
             disabled={isPending || !date || !time}
             onClick={saveReschedule}
-            className="text-primary mt-2 text-xs font-semibold"
+            className="bg-primary mt-2 min-h-9 rounded-md px-3 text-xs font-semibold text-white disabled:opacity-50"
           >
             Confirmar novo horário
           </button>
