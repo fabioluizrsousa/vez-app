@@ -28,7 +28,11 @@ export type DashboardBooking = {
   scheduledAt: Date
   clientName: string
   status: BookingStatus
-  service: { name: string; price: { toString(): string } }
+  service: {
+    name: string
+    price: { toString(): string }
+    durationMinutes: number
+  }
 }
 
 export type DashboardManualBlock = {
@@ -68,7 +72,7 @@ function getRange(period: DashboardPeriod, ref: Date) {
     case "week":
       return { start: startOfWeek(ref, WEEK_OPTS), end: endOfWeek(ref, WEEK_OPTS) }
     case "month":
-      return { start: startOfMonth(ref), end: endOfMonth(ref) }
+      return { start: startOfMonth(ref), end: endOfMonth(ref, WEEK_OPTS) }
     case "year":
       return { start: startOfYear(ref), end: endOfYear(ref) }
   }
@@ -124,7 +128,11 @@ export async function getDashboardData(
   const [currentBookings, previousBookings] = await Promise.all([
     db.booking.findMany({
       where: { professionalId, scheduledAt: { gte: start, lte: end } },
-      include: { service: { select: { name: true, price: true } } },
+      include: {
+        service: {
+          select: { name: true, price: true, durationMinutes: true },
+        },
+      },
       orderBy: { scheduledAt: "asc" },
     }),
     db.booking.findMany({
